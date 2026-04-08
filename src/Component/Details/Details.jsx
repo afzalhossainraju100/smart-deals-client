@@ -1,8 +1,11 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import thumbnailCard from "../../assets/thumbnail-card.png";
+import Modal from "../Modal/Modal.jsx";
 
-const Details = ({ product }) => {
+const Details = ({ product, onBidPlaced }) => {
+  const [isBidModalOpen, setIsBidModalOpen] = useState(false);
+
   const title =
     product?.title || product?.productName || product?.name || "Product";
   const category = product?.category || "Art And Hobbies";
@@ -161,11 +164,21 @@ const Details = ({ product }) => {
             </div>
           </article>
 
-          <button className="btn h-12 w-full border-0 bg-linear-to-r from-violet-600 to-violet-500 text-lg font-bold text-white shadow-none hover:from-violet-700 hover:to-violet-600">
+          <button
+            className="btn h-12 w-full border-0 bg-linear-to-r from-violet-600 to-violet-500 text-lg font-bold text-white shadow-none hover:from-violet-700 hover:to-violet-600"
+            onClick={() => setIsBidModalOpen(true)}
+          >
             I Want Buy This Product
           </button>
         </div>
       </div>
+
+      <Modal
+        isOpen={isBidModalOpen}
+        onClose={() => setIsBidModalOpen(false)}
+        product={product}
+        onBidPlaced={onBidPlaced}
+      />
     </section>
   );
 };

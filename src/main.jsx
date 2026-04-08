@@ -13,6 +13,7 @@ import AuthProvider from "./Contaxts/AuthProvider.jsx";
 import MyProducts from "./Component/MyProducts/MyProducts.jsx";
 import MyBids from "./Component/MyBids/MyBids.jsx";
 import PrivateRoute from "./Component/PrivateRoute/PrivateRoute.jsx";
+import CreateProduct from "./Component/CreateProduct/CreateProduct.jsx";
 
 const createJsonLoader = (url, errorMessage) => async () => {
   const response = await fetch(url);
@@ -99,6 +100,33 @@ const productDetailsLoader = async ({ params }) => {
   };
 };
 
+const myBidsLoader = async () => {
+  const [bidsResponse, productsResponse] = await Promise.all([
+    fetch("http://localhost:3000/bids"),
+    fetch("http://localhost:3000/products"),
+  ]);
+
+  if (!bidsResponse.ok) {
+    throw new Response("Failed to load bids.", { status: bidsResponse.status });
+  }
+
+  if (!productsResponse.ok) {
+    throw new Response("Failed to load products.", {
+      status: productsResponse.status,
+    });
+  }
+
+  const [bids, products] = await Promise.all([
+    bidsResponse.json(),
+    productsResponse.json(),
+  ]);
+
+  return {
+    bids: Array.isArray(bids) ? bids : [],
+    products: Array.isArray(products) ? products : [],
+  };
+};
+
 const router = createBrowserRouter([
   {
     path: "/",
@@ -120,6 +148,10 @@ const router = createBrowserRouter([
         loader: productDetailsLoader,
       },
       {
+        path: "create-product",
+        element: <CreateProduct></CreateProduct>,
+      },
+      {
         path: "register",
         Component: Register,
       },
@@ -129,6 +161,7 @@ const router = createBrowserRouter([
       },
       {
         path: "myproducts",
+        loader: allProductsLoader,
         element: (
           <PrivateRoute>
             <MyProducts></MyProducts>
@@ -137,6 +170,7 @@ const router = createBrowserRouter([
       },
       {
         path: "mybids",
+        loader: myBidsLoader,
         element: (
           <PrivateRoute>
             <MyBids></MyBids>

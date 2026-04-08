@@ -1,7 +1,29 @@
-import React from "react";
+import React, { use, useEffect, useMemo, useState } from "react";
+import { AuthContext } from "../../Contaxts/AuthContexts";
 import thumbnailCard from "../../assets/thumbnail-card.png";
+import {
+  getEntityId,
+  isSameEmail,
+  normalizeEmail,
+  patchBidStatus,
+  removeBid,
+} from "../../utils/bidUtils";
 
 const BidsSigleProducts = ({ bids = [], product }) => {
+  const { user } = use(AuthContext);
+  const [bidRows, setBidRows] = useState(Array.isArray(bids) ? bids : []);
+  const [updatingBidId, setUpdatingBidId] = useState("");
+
+  useEffect(() => {
+    setBidRows(Array.isArray(bids) ? bids : []);
+  }, [bids]);
+
+  const userEmail = normalizeEmail(user?.email);
+  const ownerEmail = normalizeEmail(
+    product?.sellerEmail || product?.seller?.email,
+  );
+  const isOwner = isSameEmail(userEmail, ownerEmail);
+
   const productTitle =
     product?.title || product?.productName || product?.name || "Product";
   const productPrice =
@@ -12,16 +34,90 @@ const BidsSigleProducts = ({ bids = [], product }) => {
     (product?.productImage && String(product.productImage).trim()) ||
     thumbnailCard;
 
+  const isBidParticipant = useMemo(
+    () =>
+      bidRows.some((bid) => {
+        const bidderEmail = normalizeEmail(
+          bid?.buyerEmail || bid?.email || bid?.buyer?.email,
+        );
+        return isSameEmail(userEmail, bidderEmail);
+      }),
+    [bidRows, userEmail],
+  );
+
+  const visibleBids = useMemo(() => {
+    if (isOwner) {
+      return bidRows;
+    }
+
+    if (isBidParticipant) {
+      return bidRows.filter((bid) => {
+        const bidderEmail = normalizeEmail(
+          bid?.buyerEmail || bid?.email || bid?.buyer?.email,
+        );
+        return isSameEmail(userEmail, bidderEmail);
+      });
+    }
+
+    return [];
+  }, [bidRows, isOwner, isBidParticipant, userEmail]);
+
+  const updateBidStatus = async (bid, nextStatus) => {
+    const bidId = getEntityId(bid);
+    if (!bidId) {
+      return;
+    }
+
+    const previousRows = bidRows;
+    setUpdatingBidId(String(bidId));
+    setBidRows((prev) =>
+      prev.map((row) =>
+        String(getEntityId(row)) === String(bidId)
+          ? { ...row, status: nextStatus }
+          : row,
+      ),
+    );
+
+    try {
+      await patchBidStatus(bidId, nextStatus);
+    } catch {
+      setBidRows(previousRows);
+    } finally {
+      setUpdatingBidId("");
+    }
+  };
+
+  const deleteBid = async (bid) => {
+    const bidId = getEntityId(bid);
+    if (!bidId) {
+      return;
+    }
+
+    const previousRows = bidRows;
+    setUpdatingBidId(String(bidId));
+    setBidRows((prev) =>
+      prev.filter((row) => String(getEntityId(row)) !== String(bidId)),
+    );
+
+    try {
+      await removeBid(bidId);
+    } catch {
+      setBidRows(previousRows);
+    } finally {
+      setUpdatingBidId("");
+    }
+  };
+
   return (
     <section className="bg-slate-100 px-4 pb-12 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-6xl">
         <p className="text-5xl font-extrabold text-slate-300/70">
-          Only Visible to Owner
+          Visible to Owner &amp; Participants
         </p>
         <h2 className="mt-2 text-4xl font-extrabold text-slate-900">
           Bids For This Products:{" "}
           <span className="text-violet-500">
-            {String(bids.length).padStart(2, "0")}
+            {String(visibleBids.length).padStart(2, "0")}
           </span>
         </h2>
 
@@ -38,23 +134,25 @@ const BidsSigleProducts = ({ bids = [], product }) => {
                 </tr>
               </thead>
               <tbody>
-                {bids.length > 0 ? (
-                  bids.map((bid, index) => {
-                    const sellerName =
-                      bid?.sellerName ||
+                {visibleBids.length > 0 ? (
+                  visibleBids.map((bid, index) => {
+                    const bidderName =
                       bid?.buyerName ||
+                      bid?.sellerName ||
                       bid?.userName ||
                       "Sara Chen";
-                    const sellerEmail =
-                      bid?.sellerEmail ||
+                    const bidderEmail =
                       bid?.buyerEmail ||
+                      bid?.sellerEmail ||
                       bid?.email ||
                       "crafts_by_brandshop.net";
                     const bidPrice =
                       bid?.bidAmount || bid?.amount || bid?.price || "$10";
+                    const bidStatus = bid?.status || "Pending";
+                    const bidId = String(getEntityId(bid));
 
                     return (
-                      <tr key={bid?._id || bid?.id || `${sellerName}-${index}`}>
+                      <tr key={bidId || `${bidderName}-${index}`}>
                         <td className="font-semibold text-slate-700">
                           {index + 1}
                         </td>
@@ -86,10 +184,10 @@ const BidsSigleProducts = ({ bids = [], product }) => {
                             <div className="h-9 w-9 rounded-full bg-slate-300" />
                             <div>
                               <p className="text-sm font-semibold text-slate-800">
-                                {sellerName}
+                                {bidderName}
                               </p>
                               <p className="text-xs text-slate-500">
-                                {sellerEmail}
+                                {bidderEmail}
                               </p>
                             </div>
                           </div>
@@ -97,18 +195,27 @@ const BidsSigleProducts = ({ bids = [], product }) => {
                         <td className="font-bold text-slate-700">{bidPrice}</td>
                         <td>
                           <div className="flex flex-wrap items-center gap-2">
-                            <button
-                              type="button"
-                              className="btn btn-xs rounded border border-emerald-500 bg-transparent text-emerald-600 shadow-none hover:bg-emerald-50"
-                            >
-                              Accept Offer
-                            </button>
+                            {isOwner && (
+                              <button
+                                type="button"
+                                className="btn btn-xs rounded border border-emerald-500 bg-transparent text-emerald-600 shadow-none hover:bg-emerald-50"
+                                onClick={() => updateBidStatus(bid, "Accepted")}
+                                disabled={updatingBidId === bidId}
+                              >
+                                Accept Offer
+                              </button>
+                            )}
                             <button
                               type="button"
                               className="btn btn-xs rounded border border-rose-500 bg-transparent text-rose-600 shadow-none hover:bg-rose-50"
+                              onClick={() => deleteBid(bid)}
+                              disabled={updatingBidId === bidId}
                             >
                               Reject Offer
                             </button>
+                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
+                              {bidStatus}
+                            </span>
                           </div>
                         </td>
                       </tr>
@@ -120,7 +227,9 @@ const BidsSigleProducts = ({ bids = [], product }) => {
                       colSpan={5}
                       className="py-10 text-center text-sm text-slate-500"
                     >
-                      No bids found for this product yet.
+                      {isOwner || isBidParticipant
+                        ? "No bids found for this product yet."
+                        : "You can view bids only if you are the product owner or a bid participant."}
                     </td>
                   </tr>
                 )}

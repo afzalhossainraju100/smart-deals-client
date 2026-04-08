@@ -64,7 +64,7 @@ const Footer = () => {
               </li>
               <li className="flex items-start gap-2">
                 <span className="mt-0.5">✆</span>
-                <span>+880 123 456 789</span>
+                <span>+880 1516503901</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="mt-0.5">⌖</span>
@@ -92,7 +92,7 @@ const Footer = () => {
                 className="inline-flex h-6 w-6 items-center justify-center text-white/90 transition hover:text-violet-300"
                 aria-label="Instagram"
               >
-                ig
+                g
               </a>
               <a
                 href="https://www.facebook.com"
