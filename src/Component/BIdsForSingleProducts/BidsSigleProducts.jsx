@@ -34,33 +34,7 @@ const BidsSigleProducts = ({ bids = [], product }) => {
     (product?.productImage && String(product.productImage).trim()) ||
     thumbnailCard;
 
-  const isBidParticipant = useMemo(
-    () =>
-      bidRows.some((bid) => {
-        const bidderEmail = normalizeEmail(
-          bid?.buyerEmail || bid?.email || bid?.buyer?.email,
-        );
-        return isSameEmail(userEmail, bidderEmail);
-      }),
-    [bidRows, userEmail],
-  );
-
-  const visibleBids = useMemo(() => {
-    if (isOwner) {
-      return bidRows;
-    }
-
-    if (isBidParticipant) {
-      return bidRows.filter((bid) => {
-        const bidderEmail = normalizeEmail(
-          bid?.buyerEmail || bid?.email || bid?.buyer?.email,
-        );
-        return isSameEmail(userEmail, bidderEmail);
-      });
-    }
-
-    return [];
-  }, [bidRows, isOwner, isBidParticipant, userEmail]);
+  const visibleBids = useMemo(() => bidRows, [bidRows]);
 
   const updateBidStatus = async (bid, nextStatus) => {
     const bidId = getEntityId(bid);
@@ -112,7 +86,7 @@ const BidsSigleProducts = ({ bids = [], product }) => {
     <section className="bg-slate-100 px-4 pb-12 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-6xl">
         <p className="text-5xl font-extrabold text-slate-300/70">
-          Visible to Owner &amp; Participants
+          Visible to Everyone
         </p>
         <h2 className="mt-2 text-4xl font-extrabold text-slate-900">
           Bids For This Products:{" "}
@@ -227,9 +201,7 @@ const BidsSigleProducts = ({ bids = [], product }) => {
                       colSpan={5}
                       className="py-10 text-center text-sm text-slate-500"
                     >
-                      {isOwner || isBidParticipant
-                        ? "No bids found for this product yet."
-                        : "You can view bids only if you are the product owner or a bid participant."}
+                      No bids found for this product yet.
                     </td>
                   </tr>
                 )}
