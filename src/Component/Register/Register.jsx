@@ -1,43 +1,110 @@
-import React from "react";
+import { use, useState } from "react";
 import { Link } from "react-router-dom";
-import { use } from "react";
+import { updateProfile } from "firebase/auth";
 import { AuthContext } from "../../Contaxts/AuthContexts";
 
+const USERS_API_URL = "http://localhost:3000/users";
+
 const Register = () => {
+  const { createUser, signInWithGoogle } = use(AuthContext);
+  const [formError, setFormError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-    const { signInWithGoogle } = use(AuthContext);
-
-    const handleGoogleSignIn = () => {
-        signInWithGoogle()
-            .then(result => {
-                const user = result.user;
-                console.log(user);
-                const newUser = {
-                    name: user.displayName,
-                    email: user.email,
-                    image: user.photoURL
-                }
-                //create user in the database
-                fetch('http://localhost:3000/users',{
-                    method: 'POST',
-                    headers: {
-                        'content-type': 'application/json'
-                    },
-                    body: JSON.stringify(newUser)
-                })
-                .then(res => res.json())
-                .then(data => {
-                    console.log(data);
-                })
-            })
-            .catch(error => {
-                console.error("Google Sign-In Error:", error);
-            });
+  const saveUserToBackend = async (user) => {
+    const newUser = {
+      name: user.displayName || user.email?.split("@")[0] || "User",
+      email: user.email,
+      image: user.photoURL || "",
     };
 
+    try {
+      const response = await fetch(USERS_API_URL, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(newUser),
+      });
+
+      if (!response.ok) {
+        throw new Error("User account created, but profile sync failed.");
+      }
+
+      return response.json();
+    } catch {
+      return null;
+    }
+  };
+
+  const handleRegister = async (event) => {
+    event.preventDefault();
+    setFormError("");
+    setSuccessMessage("");
+
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const name = String(formData.get("name") || "").trim();
+    const email = String(formData.get("email") || "")
+      .trim()
+      .toLowerCase();
+    const image = String(formData.get("image") || "").trim();
+    const password = String(formData.get("password") || "").trim();
+
+    if (!name || !email || !password) {
+      setFormError("Name, email, and password are required.");
+      return;
+    }
+
+    if (password.length < 6) {
+      setFormError("Password must be at least 6 characters.");
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      const credential = await createUser(email, password);
+
+      await updateProfile(credential.user, {
+        displayName: name,
+        photoURL: image || null,
+      });
+
+      await saveUserToBackend({
+        displayName: name,
+        email,
+        photoURL: image,
+      });
+
+      setSuccessMessage("Account created successfully.");
+      form.reset();
+    } catch (error) {
+      setFormError(error?.message || "Unable to create account.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setFormError("");
+    setSuccessMessage("");
+    setSubmitting(true);
+
+    try {
+      const result = await signInWithGoogle();
+      await saveUserToBackend(result.user);
+      setSuccessMessage("Account created successfully.");
+    } catch (error) {
+      setFormError(error?.message || "Google Sign-In Error.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
-    <section className="min-h-[calc(100vh-72px)] bg-gradient-to-br from-slate-50 via-white to-slate-100 px-4 py-10 flex items-center justify-center">
-      <div className="w-full max-w-[420px] rounded-xl bg-white px-8 py-9 shadow-[0_10px_30px_rgba(15,23,42,0.08)] ring-1 ring-slate-200/70">
+    <section className="flex min-h-[calc(100vh-72px)] items-center justify-center bg-linear-to-br from-slate-50 via-white to-slate-100 px-4 py-10">
+      <div className="w-full max-w-105 rounded-xl bg-white px-8 py-9 shadow-[0_10px_30px_rgba(15,23,42,0.08)] ring-1 ring-slate-200/70">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-slate-800">Register Now!</h1>
           <p className="mt-2 text-sm text-slate-600">
@@ -51,7 +118,7 @@ const Register = () => {
           </p>
         </div>
 
-        <form className="mt-8 space-y-4">
+        <form className="mt-8 space-y-4" onSubmit={handleRegister}>
           <div>
             <label className="mb-1.5 block text-sm font-semibold text-slate-700">
               Name
@@ -60,6 +127,7 @@ const Register = () => {
               type="text"
               name="name"
               placeholder="Mariam Swarna"
+              required
               className="input input-bordered w-full rounded-md border-slate-200 bg-white text-slate-800 placeholder:text-slate-400 focus:border-violet-500 focus:outline-none"
             />
           </div>
@@ -72,6 +140,7 @@ const Register = () => {
               type="email"
               name="email"
               placeholder="smsowkothasan@gmail.com"
+              required
               className="input input-bordered w-full rounded-md border-slate-200 bg-white text-slate-800 placeholder:text-slate-400 focus:border-violet-500 focus:outline-none"
             />
           </div>
@@ -96,15 +165,30 @@ const Register = () => {
               type="password"
               name="password"
               placeholder="************"
+              required
+              minLength={6}
               className="input input-bordered w-full rounded-md border-slate-200 bg-white text-slate-800 placeholder:text-slate-400 focus:border-violet-500 focus:outline-none"
             />
           </div>
 
+          {(formError || successMessage) && (
+            <p
+              className={`rounded-md px-3 py-2 text-sm ${
+                formError
+                  ? "bg-rose-50 text-rose-600"
+                  : "bg-emerald-50 text-emerald-700"
+              }`}
+            >
+              {formError || successMessage}
+            </p>
+          )}
+
           <button
             type="submit"
-            className="btn w-full rounded-md border-0 bg-gradient-to-r from-violet-600 to-violet-500 text-base font-semibold text-white shadow-none hover:from-violet-700 hover:to-violet-600"
+            disabled={submitting}
+            className="btn w-full rounded-md border-0 bg-linear-to-r from-violet-600 to-violet-500 text-base font-semibold text-white shadow-none hover:from-violet-700 hover:to-violet-600"
           >
-            Register
+            {submitting ? "Creating Account..." : "Register"}
           </button>
         </form>
 
@@ -119,6 +203,7 @@ const Register = () => {
         <button
           onClick={handleGoogleSignIn}
           type="button"
+          disabled={submitting}
           className="btn w-full rounded-md border border-slate-200 bg-white text-slate-700 shadow-none hover:bg-slate-50"
         >
           <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true">
@@ -139,7 +224,9 @@ const Register = () => {
               d="M43.611 20.083H42V20H24v8h11.303c-1.01 2.916-3.002 5.315-5.455 6.875l.004-.003 6.742 5.693C36.116 39.706 44 33.333 44 24c0-1.341-.138-2.65-.389-3.917z"
             />
           </svg>
-          <span className="font-semibold normal-case">Sign Up With Google</span>
+          <span className="font-semibold normal-case">
+            {submitting ? "Signing Up..." : "Sign Up With Google"}
+          </span>
         </button>
       </div>
     </section>

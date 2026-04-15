@@ -13,11 +13,20 @@ import auth from "../Firebase/firebase.init";
 
 const googleProvider = new GoogleAuthProvider();
 
+const ensureAuth = () => {
+  if (!auth) {
+    throw new Error(
+      "Firebase Auth is not configured. Add Firebase env variables and restart the dev server.",
+    );
+  }
+};
+
 const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const createUser = async (email, password) => {
+    ensureAuth();
     setLoading(true);
     try {
       return await createUserWithEmailAndPassword(auth, email, password);
@@ -27,6 +36,7 @@ const AuthProvider = ({ children }) => {
   };
 
   const signInUser = async (email, password) => {
+    ensureAuth();
     setLoading(true);
     try {
       return await signInWithEmailAndPassword(auth, email, password);
@@ -36,6 +46,7 @@ const AuthProvider = ({ children }) => {
   };
 
   const signInWithGoogle = async () => {
+    ensureAuth();
     setLoading(true);
     try {
       return await signInWithPopup(auth, googleProvider);
@@ -45,6 +56,7 @@ const AuthProvider = ({ children }) => {
   };
 
   const signOutUser = async () => {
+    ensureAuth();
     setLoading(true);
     try {
       return await signOut(auth);
@@ -54,10 +66,16 @@ const AuthProvider = ({ children }) => {
   };
 
   const resetPassword = async (email) => {
+    ensureAuth();
     return sendPasswordResetEmail(auth, email);
   };
 
   useEffect(() => {
+    if (!auth) {
+      setLoading(false);
+      return;
+    }
+
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setLoading(false);

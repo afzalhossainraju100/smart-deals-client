@@ -1,7 +1,12 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
-import { createBrowserRouter } from "react-router";
+import {
+  createBrowserRouter,
+  isRouteErrorResponse,
+  Link,
+  useRouteError,
+} from "react-router";
 import { RouterProvider } from "react-router/dom";
 import Root from "../src/Component/Layout/Root.jsx";
 import Home from "../src/Component/Home/Home.jsx";
@@ -15,42 +20,107 @@ import MyBids from "./Component/MyBids/MyBids.jsx";
 import PrivateRoute from "./Component/PrivateRoute/PrivateRoute.jsx";
 import CreateProduct from "./Component/CreateProduct/CreateProduct.jsx";
 
-const createJsonLoader = (url, errorMessage) => async () => {
-  const response = await fetch(url);
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") ||
+  "http://localhost:3000";
 
-  if (!response.ok) {
-    throw new Response(errorMessage, { status: response.status });
-  }
-
-  return response.json();
+const apiUrl = (path) => {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return `${API_BASE_URL}${normalizedPath}`;
 };
 
+const throwRouteError = (message, status = 500) => {
+  throw new Response(message, { status });
+};
+
+const fetchWithRouteError = async (url, errorMessage) => {
+  let response;
+
+  try {
+    response = await fetch(url);
+  } catch {
+    throwRouteError(`${errorMessage} API server is unreachable.`, 503);
+  }
+
+  if (!response.ok) {
+    throwRouteError(errorMessage, response.status);
+  }
+
+  return response;
+};
+
+function RouteErrorBoundary() {
+  const error = useRouteError();
+  const status = isRouteErrorResponse(error) ? error.status : 500;
+  const message = isRouteErrorResponse(error)
+    ? error.data || error.statusText || "Something went wrong."
+    : "Unable to load data. Please try again.";
+
+  return (
+    <section className="mx-auto mt-10 max-w-2xl rounded-xl border border-red-200 bg-red-50 p-6 text-red-900 shadow-sm">
+      <h1 className="text-2xl font-bold">Something went wrong</h1>
+      <p className="mt-3 text-sm">Status: {status}</p>
+      <p className="mt-2">{message}</p>
+      <div className="mt-5 flex flex-wrap gap-3">
+        <Link
+          to="/"
+          className="rounded-md bg-red-700 px-4 py-2 text-white hover:bg-red-800"
+        >
+          Go Home
+        </Link>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="rounded-md border border-red-700 px-4 py-2 text-red-800 hover:bg-red-100"
+        >
+          Retry
+        </button>
+      </div>
+    </section>
+  );
+}
+
+const createJsonLoader =
+  (url, errorMessage, fallbackData = null) =>
+  async () => {
+    try {
+      const response = await fetchWithRouteError(url, errorMessage);
+      return response.json();
+    } catch {
+      if (fallbackData !== null) {
+        return fallbackData;
+      }
+
+      throwRouteError(errorMessage, 500);
+    }
+  };
+
 const latestProductsLoader = createJsonLoader(
-  "http://localhost:3000/latest-products",
+  apiUrl("/latest-products"),
   "Failed to load recent products.",
+  [],
 );
 
 const allProductsLoader = createJsonLoader(
-  "http://localhost:3000/products",
+  apiUrl("/products"),
   "Failed to load products.",
+  [],
 );
 
 const productDetailsLoader = async ({ params }) => {
   const { id } = params;
 
   // Try dedicated details endpoint first.
-  const detailsResponse = await fetch(`http://localhost:3000/products/${id}`);
+  const detailsResponse = await fetch(apiUrl(`/products/${id}`));
   if (detailsResponse.ok) {
     return detailsResponse.json();
   }
 
   // Fallback: if API has only list endpoint, resolve details from /products.
-  const listResponse = await fetch("http://localhost:3000/products");
-  if (!listResponse.ok) {
-    throw new Response("Failed to load product details.", {
-      status: listResponse.status,
-    });
-  }
+  const listResponse = await fetchWithRouteError(
+    apiUrl("/products"),
+    "Failed to load product details.",
+  );
 
   const products = await listResponse.json();
   const matchedProduct = Array.isArray(products)
@@ -60,10 +130,10 @@ const productDetailsLoader = async ({ params }) => {
     : null;
 
   if (!matchedProduct) {
-    throw new Response("Product not found.", { status: 404 });
+    throwRouteError("Product not found.", 404);
   }
 
-  const bidsResponse = await fetch("http://localhost:3000/bids");
+  const bidsResponse = await fetch(apiUrl("/bids"));
   const bidsData = bidsResponse.ok ? await bidsResponse.json() : [];
 
   const productTitle =
@@ -101,36 +171,41 @@ const productDetailsLoader = async ({ params }) => {
 };
 
 const myBidsLoader = async () => {
-  const [bidsResponse, productsResponse] = await Promise.all([
-    fetch("http://localhost:3000/bids"),
-    fetch("http://localhost:3000/products"),
-  ]);
+  try {
+    const [bidsResponse, productsResponse] = await Promise.all([
+      fetch(apiUrl("/bids")),
+      fetch(apiUrl("/products")),
+    ]);
 
-  if (!bidsResponse.ok) {
-    throw new Response("Failed to load bids.", { status: bidsResponse.status });
+    if (!bidsResponse.ok || !productsResponse.ok) {
+      return {
+        bids: [],
+        products: [],
+      };
+    }
+
+    const [bids, products] = await Promise.all([
+      bidsResponse.json(),
+      productsResponse.json(),
+    ]);
+
+    return {
+      bids: Array.isArray(bids) ? bids : [],
+      products: Array.isArray(products) ? products : [],
+    };
+  } catch {
+    return {
+      bids: [],
+      products: [],
+    };
   }
-
-  if (!productsResponse.ok) {
-    throw new Response("Failed to load products.", {
-      status: productsResponse.status,
-    });
-  }
-
-  const [bids, products] = await Promise.all([
-    bidsResponse.json(),
-    productsResponse.json(),
-  ]);
-
-  return {
-    bids: Array.isArray(bids) ? bids : [],
-    products: Array.isArray(products) ? products : [],
-  };
 };
 
 const router = createBrowserRouter([
   {
     path: "/",
     Component: Root,
+    errorElement: <RouteErrorBoundary />,
     children: [
       {
         index: true,
@@ -184,7 +259,7 @@ const router = createBrowserRouter([
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <AuthProvider>
-      <RouterProvider router={router} />,
+      <RouterProvider router={router} />
     </AuthProvider>
   </StrictMode>,
 );

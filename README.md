@@ -1,5 +1,18 @@
 # React + Vite
 
+## Firebase Authentication Setup
+
+1. Create your local env file by copying `.env.example` to `.env.local`.
+2. Replace all placeholder values with your Firebase Web App config from Firebase Console.
+3. In Firebase Console, enable the sign-in providers you use (Email/Password, Google, etc.).
+4. Restart the dev server after env changes:
+
+```bash
+npm run dev
+```
+
+If variables are missing, the app now logs exactly which Firebase keys are invalid or missing.
+
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
 Currently, two official plugins are available:
