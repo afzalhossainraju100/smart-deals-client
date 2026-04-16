@@ -1,33 +1,28 @@
 import { useEffect, useState } from "react";
 import { AuthContext } from "./AuthContexts";
 import {
-  createUserWithEmailAndPassword,
   GoogleAuthProvider,
+  createUserWithEmailAndPassword,
   onAuthStateChanged,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
 } from "firebase/auth";
-import auth from "../Firebase/firebase.init";
+import { auth } from "../Firebase/firebase.init";
 
 const googleProvider = new GoogleAuthProvider();
 
-const ensureAuth = () => {
-  if (!auth) {
-    throw new Error(
-      "Firebase Auth is not configured. Add Firebase env variables and restart the dev server.",
-    );
-  }
-};
+const authDisabled = false;
+const authMessage = "";
 
 const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const createUser = async (email, password) => {
-    ensureAuth();
     setLoading(true);
+
     try {
       return await createUserWithEmailAndPassword(auth, email, password);
     } finally {
@@ -35,19 +30,17 @@ const AuthProvider = ({ children }) => {
     }
   };
 
-  const signInUser = async (email, password) => {
-    ensureAuth();
+  const signInUser = (email, password) => {
     setLoading(true);
-    try {
-      return await signInWithEmailAndPassword(auth, email, password);
-    } finally {
+
+    return signInWithEmailAndPassword(auth, email, password).finally(() => {
       setLoading(false);
-    }
+    });
   };
 
   const signInWithGoogle = async () => {
-    ensureAuth();
     setLoading(true);
+
     try {
       return await signInWithPopup(auth, googleProvider);
     } finally {
@@ -56,8 +49,8 @@ const AuthProvider = ({ children }) => {
   };
 
   const signOutUser = async () => {
-    ensureAuth();
     setLoading(true);
+
     try {
       return await signOut(auth);
     } finally {
@@ -66,24 +59,33 @@ const AuthProvider = ({ children }) => {
   };
 
   const resetPassword = async (email) => {
-    ensureAuth();
-    return sendPasswordResetEmail(auth, email);
+    setLoading(true);
+
+    try {
+      return await sendPasswordResetEmail(auth, email);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
-    if (!auth) {
-      setLoading(false);
-      return;
-    }
-
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setLoading(false);
     });
+
     return () => {
       unsubscribe();
     };
   }, []);
+
+  // const signInWithGoogle = async () =>
+  //   Promise.reject(new Error(AUTH_DISABLED_ERROR));
+
+  // const signOutUser = async () => Promise.resolve();
+
+  // const resetPassword = async () =>
+  //   Promise.reject(new Error(AUTH_DISABLED_ERROR));
 
   const authInfo = {
     user,
@@ -93,10 +95,11 @@ const AuthProvider = ({ children }) => {
     signInWithGoogle,
     signOutUser,
     resetPassword,
+    authDisabled,
+    authMessage,
   };
-  return (
-    <AuthContext.Provider value={authInfo}>{children}</AuthContext.Provider>
-  );
+
+  return <AuthContext value={authInfo}>{children}</AuthContext>;
 };
 
 export default AuthProvider;

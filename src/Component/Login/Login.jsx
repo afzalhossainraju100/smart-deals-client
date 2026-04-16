@@ -3,7 +3,15 @@ import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { AuthContext } from "../../Contaxts/AuthContexts";
 
 const Login = () => {
-  const { user, loading, signInUser, signInWithGoogle, resetPassword } =
+  const {
+    user,
+    loading,
+    signInUser,
+    signInWithGoogle,
+    resetPassword,
+    authDisabled,
+    authMessage,
+  } =
     use(AuthContext);
   const navigate = useNavigate();
   const location = useLocation();
@@ -25,6 +33,11 @@ const Login = () => {
     event.preventDefault();
     setFormError("");
     setSuccessMessage("");
+
+    if (authDisabled) {
+      setFormError(authMessage);
+      return;
+    }
 
     const trimmedEmail = email.trim().toLowerCase();
     const trimmedPassword = password.trim();
@@ -56,6 +69,11 @@ const Login = () => {
     setFormError("");
     setSuccessMessage("");
 
+    if (authDisabled) {
+      setFormError(authMessage);
+      return;
+    }
+
     try {
       await signInWithGoogle();
       setSuccessMessage("Login successful.");
@@ -68,6 +86,11 @@ const Login = () => {
   const handlePasswordReset = async () => {
     setFormError("");
     setSuccessMessage("");
+
+    if (authDisabled) {
+      setFormError(authMessage);
+      return;
+    }
 
     const trimmedEmail = email.trim().toLowerCase();
 
@@ -103,6 +126,12 @@ const Login = () => {
             </Link>
           </p>
         </div>
+
+        {authDisabled && (
+          <p className="mt-6 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+            {authMessage}
+          </p>
+        )}
 
         <form className="mt-8 space-y-4" onSubmit={handleLogin}>
           <div>

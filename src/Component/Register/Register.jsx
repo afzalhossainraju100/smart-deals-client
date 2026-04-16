@@ -1,12 +1,13 @@
 import { use, useState } from "react";
-import { Link } from "react-router-dom";
-import { updateProfile } from "firebase/auth";
+import { Link, useNavigate } from "react-router-dom";
 import { AuthContext } from "../../Contaxts/AuthContexts";
 
 const USERS_API_URL = "http://localhost:3000/users";
 
 const Register = () => {
-  const { createUser, signInWithGoogle } = use(AuthContext);
+  const { createUser, signInWithGoogle, authDisabled, authMessage } =
+    use(AuthContext);
+  const navigate = useNavigate();
   const [formError, setFormError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -18,21 +19,35 @@ const Register = () => {
       image: user.photoURL || "",
     };
 
+    // Include password if provided (for email/password registration)
+    if (user.password) {
+      newUser.password = user.password;
+    }
+
     try {
+      // Add timeout to prevent hanging
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
       const response = await fetch(USERS_API_URL, {
         method: "POST",
         headers: {
           "content-type": "application/json",
         },
         body: JSON.stringify(newUser),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         throw new Error("User account created, but profile sync failed.");
       }
 
-      return response.json();
-    } catch {
+      return await response.json();
+    } catch (error) {
+      console.error("Error saving user to backend:", error);
+      // Still allow registration to proceed even if backend save fails
       return null;
     }
   };
@@ -41,6 +56,11 @@ const Register = () => {
     event.preventDefault();
     setFormError("");
     setSuccessMessage("");
+
+    if (authDisabled) {
+      setFormError(authMessage);
+      return;
+    }
 
     const form = event.currentTarget;
     const formData = new FormData(form);
@@ -64,21 +84,18 @@ const Register = () => {
     setSubmitting(true);
 
     try {
-      const credential = await createUser(email, password);
-
-      await updateProfile(credential.user, {
-        displayName: name,
-        photoURL: image || null,
-      });
+      await createUser(email, password);
 
       await saveUserToBackend({
         displayName: name,
         email,
         photoURL: image,
+        password: password,
       });
 
       setSuccessMessage("Account created successfully.");
       form.reset();
+      navigate("/", { replace: true });
     } catch (error) {
       setFormError(error?.message || "Unable to create account.");
     } finally {
@@ -89,12 +106,19 @@ const Register = () => {
   const handleGoogleSignIn = async () => {
     setFormError("");
     setSuccessMessage("");
+
+    if (authDisabled) {
+      setFormError(authMessage);
+      return;
+    }
+
     setSubmitting(true);
 
     try {
       const result = await signInWithGoogle();
       await saveUserToBackend(result.user);
       setSuccessMessage("Account created successfully.");
+      navigate("/", { replace: true });
     } catch (error) {
       setFormError(error?.message || "Google Sign-In Error.");
     } finally {
@@ -117,6 +141,12 @@ const Register = () => {
             </Link>
           </p>
         </div>
+
+        {authDisabled && (
+          <p className="mt-6 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+            {authMessage}
+          </p>
+        )}
 
         <form className="mt-8 space-y-4" onSubmit={handleRegister}>
           <div>
