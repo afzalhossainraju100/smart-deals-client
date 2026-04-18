@@ -1,4 +1,4 @@
-export const BIDS_API_URL = "http://localhost:3000/bids";
+export const BIDS_API_URL = "https://smart-deals-server-flame.vercel.app/bids";
 
 export const getEntityId = (entity) => entity?._id || entity?.id || "";
 

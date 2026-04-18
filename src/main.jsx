@@ -18,7 +18,7 @@ import RouteErrorBoundary from "./Component/RouteErrorBoundary/RouteErrorBoundar
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") ||
-  "http://localhost:3000";
+  "https://smart-deals-server-flame.vercel.app";
 
 const apiUrl = (path) => {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;

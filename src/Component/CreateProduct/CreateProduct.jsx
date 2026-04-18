@@ -63,13 +63,16 @@ const CreateProduct = () => {
     };
 
     try {
-      const response = await fetch("http://localhost:3000/products", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
+      const response = await fetch(
+        "https://smart-deals-server-flame.vercel.app/products",
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify(productPayload),
         },
-        body: JSON.stringify(productPayload),
-      });
+      );
 
       if (!response.ok) {
         throw new Error("Failed to create product. Please try again.");

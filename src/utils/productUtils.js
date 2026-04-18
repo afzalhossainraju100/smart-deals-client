@@ -1,4 +1,5 @@
-export const PRODUCTS_API_URL = "http://localhost:3000/products";
+export const PRODUCTS_API_URL =
+  "https://smart-deals-server-flame.vercel.app/products";
 
 export const getProductId = (product) => product?._id || product?.id || "";
 

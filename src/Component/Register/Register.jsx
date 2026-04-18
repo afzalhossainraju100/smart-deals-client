@@ -2,7 +2,7 @@ import { use, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AuthContext } from "../../Contaxts/AuthContexts";
 
-const USERS_API_URL = "http://localhost:3000/users";
+const USERS_API_URL = "https://smart-deals-server-flame.vercel.app/users";
 
 const Register = () => {
   const { createUser, signInWithGoogle, authDisabled, authMessage } =

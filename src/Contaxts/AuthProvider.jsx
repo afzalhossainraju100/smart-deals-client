@@ -250,13 +250,16 @@ const AuthProvider = ({ children }) => {
 
         const syncAccessToken = async () => {
           try {
-            const response = await fetch("http://localhost:3000/getToken", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
+            const response = await fetch(
+              "https://smart-deals-server-flame.vercel.app/getToken",
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify(loggedUser),
               },
-              body: JSON.stringify(loggedUser),
-            });
+            );
 
             if (!response.ok) {
               throw new Error("Failed to get access token from backend.");
