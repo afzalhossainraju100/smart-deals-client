@@ -84,9 +84,12 @@ const Register = () => {
     setSubmitting(true);
 
     try {
-      await createUser(email, password);
+      await createUser(email, password, {
+        displayName: name,
+        photoURL: image,
+      });
 
-      await saveUserToBackend({
+      void saveUserToBackend({
         displayName: name,
         email,
         photoURL: image,
@@ -116,7 +119,7 @@ const Register = () => {
 
     try {
       const result = await signInWithGoogle();
-      await saveUserToBackend(result.user);
+      void saveUserToBackend(result.user);
       setSuccessMessage("Account created successfully.");
       navigate("/", { replace: true });
     } catch (error) {

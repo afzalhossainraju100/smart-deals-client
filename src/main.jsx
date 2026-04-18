@@ -1,12 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
-import {
-  createBrowserRouter,
-  isRouteErrorResponse,
-  Link,
-  useRouteError,
-} from "react-router";
+import { createBrowserRouter } from "react-router";
 import { RouterProvider } from "react-router/dom";
 import Root from "../src/Component/Layout/Root.jsx";
 import Home from "../src/Component/Home/Home.jsx";
@@ -17,8 +12,9 @@ import Login from "../src/Component/Login/Login.jsx";
 import AuthProvider from "./Contaxts/AuthProvider.jsx";
 import MyProducts from "./Component/MyProducts/MyProducts.jsx";
 import MyBids from "./Component/MyBids/MyBids.jsx";
-import PrivateRoute from "./Component/PrivateRoute/PrivateRoute.jsx";
+import PrivateRoute from "./Component/Routes/PrivateRoute.jsx";
 import CreateProduct from "./Component/CreateProduct/CreateProduct.jsx";
+import RouteErrorBoundary from "./Component/RouteErrorBoundary/RouteErrorBoundary.jsx";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") ||
@@ -48,37 +44,6 @@ const fetchWithRouteError = async (url, errorMessage) => {
 
   return response;
 };
-
-function RouteErrorBoundary() {
-  const error = useRouteError();
-  const status = isRouteErrorResponse(error) ? error.status : 500;
-  const message = isRouteErrorResponse(error)
-    ? error.data || error.statusText || "Something went wrong."
-    : "Unable to load data. Please try again.";
-
-  return (
-    <section className="mx-auto mt-10 max-w-2xl rounded-xl border border-red-200 bg-red-50 p-6 text-red-900 shadow-sm">
-      <h1 className="text-2xl font-bold">Something went wrong</h1>
-      <p className="mt-3 text-sm">Status: {status}</p>
-      <p className="mt-2">{message}</p>
-      <div className="mt-5 flex flex-wrap gap-3">
-        <Link
-          to="/"
-          className="rounded-md bg-red-700 px-4 py-2 text-white hover:bg-red-800"
-        >
-          Go Home
-        </Link>
-        <button
-          type="button"
-          onClick={() => window.location.reload()}
-          className="rounded-md border border-red-700 px-4 py-2 text-red-800 hover:bg-red-100"
-        >
-          Retry
-        </button>
-      </div>
-    </section>
-  );
-}
 
 const createJsonLoader =
   (url, errorMessage, fallbackData = null) =>
@@ -219,12 +184,20 @@ const router = createBrowserRouter([
       },
       {
         path: "products/:id",
-        Component: ProductDetails,
+        element: (
+          <PrivateRoute>
+            <ProductDetails />
+          </PrivateRoute>
+        ),
         loader: productDetailsLoader,
       },
       {
         path: "create-product",
-        element: <CreateProduct></CreateProduct>,
+        element: (
+          <PrivateRoute>
+            <CreateProduct></CreateProduct>
+          </PrivateRoute>
+        ),
       },
       {
         path: "register",

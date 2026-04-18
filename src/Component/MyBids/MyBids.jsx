@@ -4,10 +4,31 @@ import { AuthContext } from "../../Contaxts/AuthContexts";
 import { getEntityId, normalizeEmail, removeBid } from "../../utils/bidUtils";
 import thumbnailCard from "../../assets/thumbnail-card.png";
 
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") ||
+  "http://localhost:3000";
+
+const apiUrl = (path) => {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return `${API_BASE_URL}${normalizedPath}`;
+};
+
+const getAuthToken = async (currentUser) => {
+  if (!currentUser) {
+    return "";
+  }
+
+  if (typeof currentUser.getIdToken === "function") {
+    return currentUser.getIdToken();
+  }
+
+  return currentUser.accessToken || "";
+};
+
 const MyBids = () => {
   const { user } = use(AuthContext);
   const loaderData = useLoaderData();
-  const products = useMemo(
+  const initialProducts = useMemo(
     () => (Array.isArray(loaderData?.products) ? loaderData.products : []),
     [loaderData?.products],
   );
@@ -16,12 +37,67 @@ const MyBids = () => {
     [loaderData?.bids],
   );
   const [bidRows, setBidRows] = useState(initialBids);
+  const [productRows, setProductRows] = useState(initialProducts);
   const [deletingBidId, setDeletingBidId] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
     setBidRows(initialBids);
-  }, [initialBids]);
+    setProductRows(initialProducts);
+  }, [initialBids, initialProducts]);
+
+  useEffect(() => {
+    let isDisposed = false;
+
+    const fetchMyBidsWithToken = async () => {
+      if (!user) {
+        return;
+      }
+
+      try {
+        const token = await getAuthToken(user);
+
+        if (!token) {
+          return;
+        }
+
+        const headers = {
+          Authorization: `Bearer ${token}`,
+        };
+
+        const [bidsResponse, productsResponse] = await Promise.all([
+          fetch(apiUrl("/bids"), { headers }),
+          fetch(apiUrl("/products"), { headers }),
+        ]);
+
+        if (!bidsResponse.ok || !productsResponse.ok) {
+          throw new Error("Failed to load bids with authorization.");
+        }
+
+        const [bidsData, productsData] = await Promise.all([
+          bidsResponse.json(),
+          productsResponse.json(),
+        ]);
+
+        if (isDisposed) {
+          return;
+        }
+
+        setBidRows(Array.isArray(bidsData) ? bidsData : []);
+        setProductRows(Array.isArray(productsData) ? productsData : []);
+      } catch (error) {
+        if (!isDisposed) {
+          setErrorMessage(error.message || "Failed to load bids.");
+        }
+      }
+    };
+
+    fetchMyBidsWithToken();
+
+    return () => {
+      isDisposed = true;
+    };
+  }, [user]);
 
   const myBids = useMemo(() => {
     const currentUserEmail = normalizeEmail(user?.email);
@@ -35,14 +111,14 @@ const MyBids = () => {
 
   const productById = useMemo(() => {
     const map = new Map();
-    products.forEach((product) => {
+    productRows.forEach((product) => {
       const id = String(getEntityId(product));
       if (id) {
         map.set(id, product);
       }
     });
     return map;
-  }, [products]);
+  }, [productRows]);
 
   const findRelatedProduct = (bid) => {
     const bidProductId =
@@ -58,7 +134,7 @@ const MyBids = () => {
     }
 
     return (
-      products.find((product) => {
+      productRows.find((product) => {
         const productTitle =
           product?.title || product?.productName || product?.name;
         return String(productTitle) === String(bidTitle);
